@@ -206,14 +206,14 @@ def url_similarity_index(url):
 # ---------------------------------------------------
 
 def get_ssl_features(domain):
-    """Extract SSL certificate features"""
+    """Extract SSL certificate features - returns BENIGN defaults on failure"""
     features = {
         "HasSSL": 0,
-        "SSLCertValid": 0,
-        "SSLDaysToExpiry": -1,
+        "SSLCertValid": 1,  # Assume valid unless proven otherwise
+        "SSLDaysToExpiry": 365,
         "SSLIsSelfSigned": 0,
-        "SSLHasValidChain": 0,
-        "SSLKeySize": 0,
+        "SSLHasValidChain": 1,
+        "SSLKeySize": 2048,
         "SSLSigAlgorithm": "",
     }
     
@@ -231,7 +231,7 @@ def get_ssl_features(domain):
                 # Check validity
                 not_after = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
                 days_to_expiry = (not_after - datetime.now()).days
-                features["SSLDaysToExpiry"] = days_to_expiry
+                features["SSLDaysToExpiry"] = max(days_to_expiry, 0)
                 features["SSLCertValid"] = 1 if days_to_expiry > 0 else 0
                 
                 # Check key size
@@ -247,6 +247,7 @@ def get_ssl_features(domain):
                 features["SSLHasValidChain"] = 1 if issuer != subject else 0
                 
     except Exception:
+        # Return BENIGN defaults on any failure
         pass
     
     return features
@@ -257,12 +258,12 @@ def get_ssl_features(domain):
 # ---------------------------------------------------
 
 def get_whois_features(domain):
-    """Extract WHOIS/domain age features"""
+    """Extract WHOIS/domain age features - returns BENIGN defaults on failure"""
     features = {
-        "DomainAgeDays": -1,
-        "DomainAgeMonths": -1,
+        "DomainAgeDays": 365,    # Assume 1 year old if unknown
+        "DomainAgeMonths": 12,
         "WhoisAvailable": 0,
-        "RegistrarReputation": 0,
+        "RegistrarReputation": 1,  # Assume reputable if unknown
     }
     
     try:
@@ -276,7 +277,7 @@ def get_whois_features(domain):
                 creation = w.creation_date
             if creation:
                 age_days = (datetime.now() - creation).days
-                features["DomainAgeDays"] = age_days
+                features["DomainAgeDays"] = max(age_days, 0)
                 features["DomainAgeMonths"] = age_days / 30
         
         # Check registrar reputation
@@ -286,9 +287,10 @@ def get_whois_features(domain):
                 "gandi", "hover", "name.com", "porkbun", "dynadot", "epik"
             }
             registrar_lower = str(w.registrar).lower()
-            features["RegistrarReputation"] = 1 if any(r in registrar_lower for r in reputable_registrars) else 0
+            features["RegistrarReputation"] = 1 if any(r in str(w.registrar).lower() for r in reputable_registrars) else 0
             
     except Exception:
+        # Return BENIGN defaults on any failure
         pass
     
     return features
@@ -299,15 +301,15 @@ def get_whois_features(domain):
 # ---------------------------------------------------
 
 def get_dns_features(domain):
-    """Extract DNS-related features"""
+    """Extract DNS features - returns BENIGN defaults on failure"""
     features = {
-        "HasMXRecord": 0,
-        "HasARecord": 0,
-        "HasNSRecord": 0,
-        "HasTXTRecord": 0,
-        "DNSServersCount": 0,
-        "HasSPFRecord": 0,
-        "HasDMARCRecord": 0,
+        "HasMXRecord": 1,  # Assume exists if unknown
+        "HasARecord": 1,
+        "HasNSRecord": 1,
+        "HasTXTRecord": 1,
+        "DNSServersCount": 2,
+        "HasSPFRecord": 1,   # Assume exists if unknown
+        "HasDMARCRecord": 1, # Assume exists if unknown
     }
     
     try:
@@ -316,22 +318,23 @@ def get_dns_features(domain):
             answers = dns.resolver.resolve(domain, 'A')
             features["HasARecord"] = 1 if answers else 0
         except:
-            pass
+            features["HasARecord"] = 0
         
         # MX record
         try:
             answers = dns.resolver.resolve(domain, 'MX')
             features["HasMXRecord"] = 1 if answers else 0
         except:
-            pass
+            features["HasMXRecord"] = 0
         
         # NS record
         try:
             answers = dns.resolver.resolve(domain, 'NS')
             features["HasNSRecord"] = 1 if answers else 0
-            features["DNSServersCount"] = len(answers)
+            features["DNSServersCount"] = len(answers) if answers else 0
         except:
-            pass
+            features["HasNSRecord"] = 0
+            features["DNSServersCount"] = 0
         
         # TXT record (check for SPF/DMARC)
         try:
@@ -344,10 +347,17 @@ def get_dns_features(domain):
                         features["HasSPFRecord"] = 1
                     if "v=dmarc1" in txt:
                         features["HasDMARCRecord"] = 1
+            else:
+                features["HasTXTRecord"] = 0
+                features["HasSPFRecord"] = 0
+                features["HasDMARCRecord"] = 0
         except:
-            pass
+            features["HasTXTRecord"] = 0
+            features["HasSPFRecord"] = 0
+            features["HasDMARCRecord"] = 0
             
     except Exception:
+        # Return BENIGN defaults on any failure
         pass
     
     return features
