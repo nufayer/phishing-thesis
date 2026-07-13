@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Large dataset files (can be regenerated)
+dataset/*.csv
+!dataset/top-1m.csv
+!dataset/openphish_feed.txt
+
+# Model files (optional - can be large)
+models/*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
