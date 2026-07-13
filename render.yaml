@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: phishshield
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      pip install --no-cache-dir -r requirements.txt
+    startCommand: gunicorn -b 0.0.0.0:$PORT app:app --timeout 120 --workers 1
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PORT
+        value: "10000"
+      - key: MODEL_URL
+        sync: false
+    # Note: No persistent disk on free tier - model downloads at startup
